@@ -1,32 +1,17 @@
 local QBCore = exports['qb-core']:GetCoreObject()
-
-local function SpawnCrate()
-    local modelHash = `gr_prop_gr_crates_sam_01a`
-
-    if not HasModelLoaded(modelHash) then
-        RequestModel(modelHash)
-        while not HasModelLoaded(modelHash) do
-            Citizen.Wait(1)
-        end
-    end
-
-    local loc = Config.Locations[math.random(1, #Config.Locations)]
-
-    local obj = CreateObject(modelHash, loc.x, loc.y, loc.z, true, true, false)
-
-    PlaceObjectOnGroundProperly(obj)
-
-    TriggerServerEvent("kg-cayo-airdrop:SetSpawned", true)
-end
+local obj = nil
 
 RegisterNetEvent('kg-cayo-airdrop:LootCrate', function(entity)
     local ped = PlayerPedId()
+    local pedPos = GetEntityCoords(ped)
     TriggerEvent('animations:client:EmoteCommandStart', {"mechanic"})
     TriggerServerEvent('kg-cayo-airdrop:MessageBounce', "Someone Has Found The Airdrop!!!")
 
     local time = 120000
 
     if Config.Debug == true then time = 5000 end
+
+    AddExplosion(pedPos, 50, 0.0, true, false, 0.0)
 
     QBCore.Functions.Progressbar('skin', 'Searching...', time, false, true, {
         disableMovement = true,
@@ -38,20 +23,11 @@ RegisterNetEvent('kg-cayo-airdrop:LootCrate', function(entity)
             ClearPedTasks(ped)
             Wait(500)
             TriggerEvent('animations:client:EmoteCommandStart', {"c"})
-            TriggerServerEvent('kg-cayo-airdrop:SetSpawned', false)
             TriggerServerEvent('kg-cayo-airdrop:DeleteCrate', NetworkGetNetworkIdFromEntity(entity))
         end, function()
             ClearPedTasks(ped)
             Wait(500)
             TriggerEvent('animations:client:EmoteCommandStart', {"c"})
-    end)
-end)
-
-RegisterNetEvent('kg-cayo-airdrop:SpawnCrate', function()
-    QBCore.Functions.TriggerCallback('kg-cayo-airdrop:IsCrateSpawned', function(result)
-        if result == false then
-            SpawnCrate()
-        end
     end)
 end)
 
@@ -64,25 +40,35 @@ RegisterNetEvent('kg-cayo-airdrop:SendMessageLocal', function(mtype, message)
 end)
 
 Citizen.CreateThread(function()
-    QBCore.Functions.TriggerCallback('kg-cayo-airdrop:IsCrateSpawned', function(result)
-        if result == false then
-            SpawnCrate()
+    if Config.Target == 'qb' then
+        exports['qb-target']:AddTargetModel("gr_prop_gr_crates_sam_01a", {
+            options = {
+            {
+                type = "client",
+                label = 'Loot Crate',
+                action = function(entity) 
+                    if IsPedAPlayer(entity) then return false end
+                    TriggerEvent('kg-cayo-airdrop:LootCrate', entity)
+                end,
+            }
+        },
+            distance = 2.5,
+        })
+    else
+        local action = function(data)
+            if IsPedAPlayer(data.entity) then return false end
+            TriggerEvent('kg-cayo-airdrop:LootCrate', data.entity)
         end
-    end)
-
-    exports['qb-target']:AddTargetModel("gr_prop_gr_crates_sam_01a", {
-        options = {
-        {
-            type = "client",
-            label = 'Loot Crate',
-            action = function(entity) 
-                if IsPedAPlayer(entity) then return false end
-                TriggerEvent('kg-cayo-airdrop:LootCrate', entity)
-            end,
+    
+        local options = {
+            name = "cayo-loot-crate",
+            label = "Loot Crate",
+            onSelect = action,
+            distance = 2.5,
         }
-    },
-        distance = 2.5,
-    })
+
+        exports.ox_target:addModel(`gr_prop_gr_crates_sam_01a`, options)
+    end
 end)
 
 AddEventHandler('onResourceStop', function(resourceName)
@@ -90,5 +76,9 @@ AddEventHandler('onResourceStop', function(resourceName)
       return
     end
 
-    exports['qb-target']:RemoveTargetModel("gr_prop_gr_crates_sam_01a")
+    if Config.Target == 'qb' then
+        exports['qb-target']:RemoveTargetModel("gr_prop_gr_crates_sam_01a")
+    else
+        exports.ox_target:removeModel(`gr_prop_gr_crates_sam_01a`)
+    end
 end)

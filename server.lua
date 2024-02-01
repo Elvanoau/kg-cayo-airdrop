@@ -1,36 +1,43 @@
 local QBCore = exports['qb-core']:GetCoreObject()
 local Spawned = false
+local box = nil
 
-RegisterServerEvent('kg-cayo-airdrop:SetSpawned', function(bool)
-    Spawned = bool
-end)
-
-RegisterServerEvent('kg-cayo-airdrop:Respawn', function(src)
+RegisterServerEvent('kg-cayo-airdrop:Respawn', function()
     if Spawned == true then return end
 
-    local player = src
+    Citizen.Wait(Config.RespawnTime)
 
-    Citizen.Wait(300000)
+    local loc = Config.Locations[math.random(1, #Config.Locations)]
 
-    TriggerClientEvent('kg-cayo-airdrop:SpawnCrate', player)
+    box = CreateObjectNoOffset(`gr_prop_gr_crates_sam_01a`, loc, true, true, false)
 
+    Spawned = true
+end)
+
+RegisterNetEvent('kg-cayo-airdrop:Spawn', function()
+    if Spawned == true then return end
+
+    local loc = Config.Locations[math.random(1, #Config.Locations)]
+
+    box = CreateObjectNoOffset(`gr_prop_gr_crates_sam_01a`, loc, true, true, false)
+
+    Spawned = true
 end)
 
 RegisterServerEvent('kg-cayo-airdrop:GiveLoot', function()
 
     if Spawned == false then return end
 
-    local src = source
-    local Player = QBCore.Functions.GetPlayer(src)
+    local Player = QBCore.Functions.GetPlayer(source)
 
     for i = 1, 3 do
         local item = Config.Items[math.random(1, #Config.Items)]
         Player.Functions.AddItem(item, 1)
-        TriggerClientEvent("inventory:client:ItemBox", src, QBCore.Shared.Items[item], "add", 1)
+        TriggerClientEvent("inventory:client:ItemBox", source, QBCore.Shared.Items[item], "add", 1)
     end
 
     Spawned = false
-    TriggerEvent('kg-cayo-airdrop:Respawn', src)
+    TriggerEvent('kg-cayo-airdrop:Respawn', source)
     TriggerClientEvent('kg-cayo-airdrop:SendMessageLocal', -1, "Alert", "Airdrop Has Been Stolen!!!")
 end)
 
@@ -43,6 +50,7 @@ RegisterServerEvent('kg-cayo-airdrop:DeleteCrate', function(id)
     DeleteEntity(ent)
 end)
 
-QBCore.Functions.CreateCallback('kg-cayo-airdrop:IsCrateSpawned', function(source, cb)
-    cb(Spawned)
+Citizen.CreateThread(function()
+    print('Spawned Cayo AirDrop')
+    TriggerEvent('kg-cayo-airdrop:Spawn')
 end)
